@@ -1,6 +1,6 @@
 # 🤖 Agent 交接文档 | AGENT HANDOVER
 
-> **文档版本**: v1.4  
+> **文档版本**: v1.5  
 > **更新日期**: 2024-12-29  
 > **适用对象**: 接手的 AI Agent 或开发者
 
@@ -62,9 +62,11 @@ Quantitative_Trading/
 │   │   ├── 📄 __init__.py            # ✅ 模块初始化
 │   │   └── 📄 run_backtest.py        # ✅ 回测执行器 + 报告生成
 │   │
-│   └── 📁 risk/
-│       ├── 📄 __init__.py            # ✅ 模块初始化
-│       └── 📄 rules.py               # ✅ 风控规则 (ST/停牌/持仓限制/涨跌停)
+│   ├── 📁 risk/
+│   │   ├── 📄 __init__.py            # ✅ 模块初始化
+│   │   └── 📄 rules.py               # ✅ 风控规则 (ST/停牌/持仓限制/涨跌停)
+│   │
+│   └── 📄 dry_run.py                 # ✅ 模拟实盘/端到端测试
 │
 ├── 📁 tests/
 │   ├── 📄 test_etl.py               # ✅ ETL 单元测试 (monkeypatch mock)
@@ -295,6 +297,43 @@ manager.add_rule(PriceLimitRule())
 passed, results = manager.check_orders(orders)
 ```
 
+**模拟实盘**:
+```python
+from src.dry_run import PaperTrader
+
+# 创建交易器
+trader = PaperTrader(
+    model_path="/app/data/models/latest_model.pkl",
+    portfolio_path="/app/data/portfolio.json",
+    reports_dir="/app/data/reports",
+    topk=50,
+    n_drop=100,
+    init_cash=1_000_000.0,
+)
+
+# 运行每日循环
+report = trader.run_daily_cycle(date="2024-12-29")
+
+# 查看报告
+print(f"总资产: {report.portfolio_value:,.0f} 元")
+print(f"交易笔数: {len(report.trades)}")
+```
+
+或使用命令行：
+```bash
+python -m src.dry_run \
+    --model /app/data/models/latest_model.pkl \
+    --date 2024-12-29 \
+    --topk 50 \
+    --init-cash 1000000
+```
+
+**虚拟撮合规则**：
+- 买入价 = 参考价 × (1 + 0.0002)  # 滑点 0.02%
+- 卖出价 = 参考价 × (1 - 0.0002)  # 滑点 0.02%
+- 买入成本 = max(成交金额 × 0.0002, 5元)  # 佣金
+- 卖出成本 = max(成交金额 × 0.0012, 5元)  # 佣金+印花税
+
 #### Stage 3: NLP (新闻情感分析)
 
 | 文件 | 功能 | 输入 | 输出 |
@@ -385,6 +424,12 @@ passed, results = manager.check_orders(orders)
   - [x] PositionLimitRule: 单只股票持仓比例限制
   - [x] PriceLimitRule: 涨跌停限制
   - [x] RiskManager: 多规则管理器
+- [x] 模拟实盘 (`src/dry_run.py`)
+  - [x] PaperTrader: 模拟交易器
+  - [x] VirtualExchange: 虚拟撮合引擎
+  - [x] 持仓管理 (加载/保存 JSON)
+  - [x] 每日循环 (数据->预测->策略->风控->撮合)
+  - [x] 交易成本和滑点模拟
 
 ### 测试覆盖
 
@@ -396,10 +441,11 @@ passed, results = manager.check_orders(orders)
 - [x] 滚动训练测试 (`test_model.py::TestRollingTrainer`)
 - [x] 回测模块测试 (`test_backtest.py`)
 - [x] 风控模块测试 (`test_risk.py`)
+- [x] 模拟实盘测试 (`test_dry_run.py`)
 - [x] 集成测试 (`test_integration.py`)
-- [ ] 端到端真实数据测试
+- [x] 端到端测试 (Dry Run with mocks)
 
-**测试统计**: 86 个测试用例全部通过 ✅
+**测试统计**: 106 个测试用例全部通过 ✅
 
 ### 文档
 
@@ -525,6 +571,8 @@ print(f"黑名单: {result.blacklist}")
 | 滚动训练模型 | `/app/data/models/rolling/*.pkl` |
 | 滚动预测结果 | `/app/data/predictions/rolling/*.csv` |
 | 回测报告 | `/app/data/backtest_reports/` |
+| 模拟实盘持仓 | `/app/data/portfolio.json` |
+| 每日交易报告 | `/app/data/reports/report_*.json` |
 | 最终买入列表 | `/app/data/final_buy_list_{date}.csv` |
 | FinBERT 模型缓存 | `/app/data/models/` |
 | Qlib 配置 | `/app/config/workflow.yaml` |

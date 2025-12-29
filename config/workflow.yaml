@@ -1,0 +1,91 @@
+# Qlib Workflow Configuration
+# Market: CSI300
+# Features: Alpha158
+# Label: 5-day forward return
+# Model: LightGBM (ranking task)
+
+qlib_init:
+  provider_uri: /app/data/qlib_bin
+  region: cn
+
+market: csi300
+
+data_handler_config:
+  start_time: "2020-01-01"
+  end_time: "2024-01-01"
+  fit_start_time: "2020-01-01"
+  fit_end_time: "2022-12-31"
+  instruments: csi300
+
+  label:
+    - "Ref($close, -5) / $close - 1"
+
+  feature:
+    class: Alpha158
+    module_path: qlib.contrib.data.handler
+    kwargs:
+      instruments: csi300
+      start_time: "2020-01-01"
+      end_time: "2024-01-01"
+
+  learn_processors:
+    - class: DropnaLabel
+      module_path: qlib.data.dataset.processor
+    - class: CSZScoreNorm
+      module_path: qlib.data.dataset.processor
+      kwargs:
+        fields_group: label
+    - class: Fillna
+      module_path: qlib.data.dataset.processor
+      kwargs:
+        fields_group: feature
+        fill_value: 0
+
+  infer_processors:
+    - class: Fillna
+      module_path: qlib.data.dataset.processor
+      kwargs:
+        fields_group: feature
+        fill_value: 0
+
+dataset:
+  class: DatasetH
+  module_path: qlib.data.dataset
+  kwargs:
+    handler:
+      class: DataHandlerLP
+      module_path: qlib.data.dataset.handler
+      kwargs: ${data_handler_config}
+    segments:
+      train:
+        - "2020-01-01"
+        - "2022-06-30"
+      valid:
+        - "2022-07-01"
+        - "2022-12-31"
+      test:
+        - "2023-01-01"
+        - "2024-01-01"
+
+model:
+  class: LGBModel
+  module_path: qlib.contrib.model.gbdt
+  kwargs:
+    loss: mse
+    metric: mse
+    num_leaves: 64
+    learning_rate: 0.05
+    n_estimators: 500
+    early_stopping_rounds: 50
+    verbose: -1
+
+task:
+  model: ${model}
+  dataset: ${dataset}
+
+record:
+  - class: SignalRecord
+    module_path: qlib.workflow.record_temp
+  - class: SigAnaRecord
+    module_path: qlib.workflow.record_temp
+

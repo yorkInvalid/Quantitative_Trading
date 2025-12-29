@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  quant-engine:
+    build: .
+    container_name: quant_engine
+    working_dir: /app
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./src:/app/src
+      - ./tests:/app/tests
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+    command: [ "bash", "-c", "tail -f /dev/null" ]

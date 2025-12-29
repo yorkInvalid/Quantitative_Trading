@@ -1,0 +1,61 @@
+# =============================================================================
+# Docker Build Ignore File
+# Prevents large/unnecessary files from being copied into the image
+# =============================================================================
+
+# Data directories (should be mounted as volumes, not built into image)
+data/
+logs/
+
+# Git repository
+.git/
+.gitignore
+
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+
+# Documentation (optional, remove if needed in container)
+*.md
+!README.md
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# Reference documents
+ref_doc/
+
+

@@ -214,3 +214,129 @@ class TestModelPersistence:
         with pytest.raises(FileNotFoundError):
             load_model(str(tmp_path / "nonexistent.pkl"))
 
+
+class TestRollingTrainer:
+    """Tests for rolling trainer module."""
+
+    def test_load_rolling_config(self, tmp_path):
+        """Test loading rolling workflow config."""
+        from src.model.rolling_trainer import load_config
+
+        # Create a test config
+        test_config = {
+            "qlib_init": {"provider_uri": "/test/path"},
+            "rolling": {
+                "step": 20,
+                "train_window": 480,
+                "valid_window": 60,
+                "test_window": 20,
+            },
+            "task": {
+                "model": {"class": "LGBModel"},
+            },
+        }
+        config_path = tmp_path / "rolling_config.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(test_config, f)
+
+        loaded = load_config(str(config_path))
+        assert loaded["rolling"]["step"] == 20
+        assert loaded["rolling"]["train_window"] == 480
+
+    def test_generate_rolling_windows(self):
+        """Test rolling window generation."""
+        from src.model.rolling_trainer import generate_rolling_windows
+
+        # Create a simple calendar
+        calendar = [f"2020-01-{i:02d}" for i in range(1, 32)]
+
+        windows = generate_rolling_windows(
+            calendar=calendar,
+            first_train_end="2020-01-20",
+            train_window=10,
+            valid_window=5,
+            test_window=5,
+            step=5,
+        )
+
+        # Should generate at least one window
+        assert len(windows) >= 1
+
+        # Check first window structure
+        first_window = windows[0]
+        assert first_window.window_id == 0
+        assert first_window.train_start is not None
+        assert first_window.test_end is not None
+
+    def test_rolling_window_dataclass(self):
+        """Test RollingWindow dataclass."""
+        from src.model.rolling_trainer import RollingWindow
+
+        window = RollingWindow(
+            train_start="2020-01-01",
+            train_end="2020-06-30",
+            valid_start="2020-07-01",
+            valid_end="2020-09-30",
+            test_start="2020-10-01",
+            test_end="2020-10-31",
+            window_id=0,
+        )
+
+        assert window.window_id == 0
+        assert "Window 0" in repr(window)
+        assert "2020-01-01" in repr(window)
+
+    def test_save_and_load_rolling_model(self, tmp_path):
+        """Test saving and loading rolling model."""
+        from src.model.rolling_trainer import (
+            RollingWindow,
+            save_rolling_model,
+            load_rolling_model,
+        )
+
+        # Create a mock model
+        mock_model = {"type": "LGBModel", "window": 0}
+
+        window = RollingWindow(
+            train_start="2020-01-01",
+            train_end="2020-06-30",
+            valid_start="2020-07-01",
+            valid_end="2020-09-30",
+            test_start="2020-10-01",
+            test_end="2020-10-31",
+            window_id=0,
+        )
+
+        # Save
+        model_path = save_rolling_model(mock_model, window, str(tmp_path))
+        assert os.path.exists(model_path)
+        assert "20201001" in model_path  # test_start date in filename
+
+        # Load
+        loaded = load_rolling_model(model_path)
+        assert loaded == mock_model
+
+    def test_rolling_result_dataclass(self):
+        """Test RollingResult dataclass."""
+        from src.model.rolling_trainer import RollingWindow, RollingResult
+
+        window = RollingWindow(
+            train_start="2020-01-01",
+            train_end="2020-06-30",
+            valid_start="2020-07-01",
+            valid_end="2020-09-30",
+            test_start="2020-10-01",
+            test_end="2020-10-31",
+            window_id=0,
+        )
+
+        result = RollingResult(
+            window=window,
+            model_path="/path/to/model.pkl",
+            predictions_path="/path/to/pred.csv",
+            metrics={"pred_count": 100, "pred_mean": 0.5},
+        )
+
+        assert result.window.window_id == 0
+        assert result.metrics["pred_count"] == 100
+

@@ -1,0 +1,81 @@
+# =============================================================================
+# Rolling Training Workflow Configuration
+# =============================================================================
+# 滚动训练配置：每 20 个交易日（约 1 个月）重新训练模型
+# 使用 Alpha158 特征 + LightGBM 模型
+
+# Qlib 初始化配置
+qlib_init:
+  provider_uri: /app/data/qlib_bin
+  region: cn
+
+# 滚动训练参数
+rolling:
+  # 滚动步长（交易日数）
+  step: 20
+  # 训练窗口大小（交易日数），约 2 年
+  train_window: 480
+  # 验证窗口大小（交易日数），约 3 个月
+  valid_window: 60
+  # 测试窗口大小（交易日数），等于 step
+  test_window: 20
+  # 数据时间范围
+  start_time: "2015-01-01"
+  end_time: "2024-12-31"
+  # 首次训练结束时间（之后开始滚动）
+  first_train_end: "2020-12-31"
+
+# 模型输出目录
+output:
+  model_dir: /app/data/models/rolling
+  predictions_dir: /app/data/predictions/rolling
+
+# 实验名称
+experiment_name: rolling_lgb
+
+# =============================================================================
+# Task 配置（符合 Qlib 标准格式）
+# =============================================================================
+task:
+  model:
+    class: LGBModel
+    module_path: qlib.contrib.model.gbdt
+    kwargs:
+      loss: mse
+      colsample_bytree: 0.8879
+      learning_rate: 0.0421
+      subsample: 0.8789
+      lambda_l1: 205.6999
+      lambda_l2: 580.9768
+      max_depth: 8
+      num_leaves: 210
+      num_threads: 20
+
+  dataset:
+    class: DatasetH
+    module_path: qlib.data.dataset
+    kwargs:
+      handler:
+        class: Alpha158
+        module_path: qlib.contrib.data.handler
+        kwargs:
+          start_time: "2015-01-01"
+          end_time: "2024-12-31"
+          fit_start_time: "2015-01-01"
+          fit_end_time: "2022-12-31"
+          instruments: csi300
+      segments:
+        train:
+          - "2015-01-01"
+          - "2020-06-30"
+        valid:
+          - "2020-07-01"
+          - "2020-12-31"
+        test:
+          - "2021-01-01"
+          - "2021-01-31"
+
+  record:
+    class: SignalRecord
+    module_path: qlib.workflow.record_temp
+

@@ -1,6 +1,6 @@
 # 🤖 Agent 交接文档 | AGENT HANDOVER
 
-> **文档版本**: v1.1  
+> **文档版本**: v1.2  
 > **更新日期**: 2024-12-29  
 > **适用对象**: 接手的 AI Agent 或开发者
 
@@ -36,7 +36,8 @@ Quantitative_Trading/
 ├── 📄 AGENT_HANDOVER.md             # ✅ 本文档
 │
 ├── 📁 config/
-│   └── 📄 workflow.yaml             # ✅ Qlib 训练配置 (Alpha158 + LGBModel + CSI300)
+│   ├── 📄 workflow.yaml             # ✅ Qlib 训练配置 (Alpha158 + LGBModel + CSI300)
+│   └── 📄 rolling_workflow.yaml     # ✅ 滚动训练配置 (每 20 交易日重训)
 │
 ├── 📁 src/
 │   ├── 📄 main.py                   # ✅ 主入口，串联 ETL→Model→NLP→Strategy 流水线
@@ -46,7 +47,8 @@ Quantitative_Trading/
 │   │   └── 📄 converter.py          # ✅ CSV → Qlib 二进制格式转换器
 │   │
 │   ├── 📁 model/
-│   │   └── 📄 trainer.py            # ✅ Qlib 模型训练 + 预测输出
+│   │   ├── 📄 trainer.py            # ✅ Qlib 模型训练 + 预测输出 + 持久化
+│   │   └── 📄 rolling_trainer.py    # ✅ 滚动训练模块 (增量更新)
 │   │
 │   ├── 📁 nlp/
 │   │   └── 📄 sentiment.py          # ✅ FinBERT 情感分析器 (Score = P(+) - P(-))
@@ -199,6 +201,26 @@ run_workflow(save_model_to_disk=True)  # 自动保存到 /app/data/models/traine
 predict_only(model_path="/app/data/models/trained/lgb_model_xxx.pkl")
 ```
 
+**滚动训练 (Rolling Training)**:
+```python
+from src.model.rolling_trainer import run_rolling_training, merge_rolling_predictions
+
+# 执行滚动训练（每 20 交易日重训）
+results = run_rolling_training(config_path="/app/config/rolling_workflow.yaml")
+
+# 合并所有滚动预测
+merged_df = merge_rolling_predictions(
+    predictions_dir="/app/data/predictions/rolling",
+    output_path="/app/data/predictions/rolling_merged.csv"
+)
+```
+
+滚动训练参数（在 `rolling_workflow.yaml` 中配置）：
+- `step`: 20 交易日（约 1 个月）
+- `train_window`: 480 交易日（约 2 年）
+- `valid_window`: 60 交易日（约 3 个月）
+- `test_window`: 20 交易日（等于 step）
+
 #### Stage 3: NLP (新闻情感分析)
 
 | 文件 | 功能 | 输入 | 输出 |
@@ -253,7 +275,11 @@ predict_only(model_path="/app/data/models/trained/lgb_model_xxx.pkl")
   - [x] `load_model()` - 从文件加载模型
   - [x] `get_latest_model()` - 获取最新保存的模型
   - [x] `predict_only()` - 仅预测模式（不训练）
-- [ ] 增量训练支持
+- [x] 增量滚动训练 (`src/model/rolling_trainer.py`)
+  - [x] 滚动窗口生成 (每 20 交易日)
+  - [x] 自动时间窗口划分 (Train/Valid/Test)
+  - [x] 模型按时间戳保存到 `/app/data/models/rolling/`
+  - [x] 预测结果合并功能
 
 ### NLP 模块
 
@@ -282,10 +308,11 @@ predict_only(model_path="/app/data/models/trained/lgb_model_xxx.pkl")
 - [x] 模型持久化测试 (`test_model.py::TestModelPersistence`)
 - [x] NLP 情感测试 (`test_nlp.py`)
 - [x] 策略模块测试 (`test_strategy.py`)
+- [x] 滚动训练测试 (`test_model.py::TestRollingTrainer`)
 - [x] 集成测试 (`test_integration.py`)
 - [ ] 端到端真实数据测试
 
-**测试统计**: 48 个测试用例全部通过 ✅
+**测试统计**: 53 个测试用例全部通过 ✅
 
 ### 文档
 
@@ -408,6 +435,8 @@ print(f"黑名单: {result.blacklist}")
 | 交易信号输出 | `/app/data/trade_signals_{date}.csv` |
 | 持仓记录 | `/app/data/holdings.csv` |
 | 训练好的模型 | `/app/data/models/trained/*.pkl` |
+| 滚动训练模型 | `/app/data/models/rolling/*.pkl` |
+| 滚动预测结果 | `/app/data/predictions/rolling/*.csv` |
 | 最终买入列表 | `/app/data/final_buy_list_{date}.csv` |
 | FinBERT 模型缓存 | `/app/data/models/` |
 | Qlib 配置 | `/app/config/workflow.yaml` |

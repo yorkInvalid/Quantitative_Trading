@@ -8,11 +8,11 @@ from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 
-from qlib.contrib.strategy import BaseStrategy
+from qlib.contrib.strategy.signal_strategy import BaseSignalStrategy
 from qlib.backtest.decision import Order, OrderDir, TradeDecisionWO
 
 
-class TopKStrategy(BaseStrategy):
+class TopKStrategy(BaseSignalStrategy):
     """
     Top-K 选股策略。
     

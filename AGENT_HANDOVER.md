@@ -1,6 +1,6 @@
 # 🤖 Agent 交接文档 | AGENT HANDOVER
 
-> **文档版本**: v1.3  
+> **文档版本**: v1.4  
 > **更新日期**: 2024-12-29  
 > **适用对象**: 接手的 AI Agent 或开发者
 
@@ -58,9 +58,13 @@ Quantitative_Trading/
 │   │   ├── 📄 topk_dropout.py        # ✅ Top-K Dropout 换仓策略
 │   │   └── 📄 topk_strategy.py       # ✅ Qlib 回测策略 (BaseStrategy)
 │   │
-│   └── 📁 backtest/
+│   ├── 📁 backtest/
+│   │   ├── 📄 __init__.py            # ✅ 模块初始化
+│   │   └── 📄 run_backtest.py        # ✅ 回测执行器 + 报告生成
+│   │
+│   └── 📁 risk/
 │       ├── 📄 __init__.py            # ✅ 模块初始化
-│       └── 📄 run_backtest.py        # ✅ 回测执行器 + 报告生成
+│       └── 📄 rules.py               # ✅ 风控规则 (ST/停牌/持仓限制/涨跌停)
 │
 ├── 📁 tests/
 │   ├── 📄 test_etl.py               # ✅ ETL 单元测试 (monkeypatch mock)
@@ -258,6 +262,39 @@ python -m src.backtest.run_backtest \
     --topk 50
 ```
 
+**风控模块**:
+```python
+from src.risk.rules import (
+    Order, RiskManager, StopSignRule, 
+    PositionLimitRule, PriceLimitRule, apply_risk_rules
+)
+
+# 创建订单
+orders = [
+    Order("600519", "BUY", 100, 1800.0),
+    Order("000001", "BUY", 1000, 10.0),
+]
+
+# 方式1: 使用便捷函数
+passed_orders, summary = apply_risk_rules(
+    orders=orders,
+    enable_st_filter=True,      # 过滤 ST 股票
+    enable_suspend_filter=True,  # 过滤停牌股票
+    enable_position_limit=True,  # 持仓限制
+    enable_price_limit=True,     # 涨跌停限制
+    max_position_ratio=0.10,     # 单只最大 10%
+    total_value=1_000_000.0,     # 总资产
+)
+
+# 方式2: 使用 RiskManager
+manager = RiskManager()
+manager.add_rule(StopSignRule())
+manager.add_rule(PositionLimitRule(max_position_ratio=0.10))
+manager.add_rule(PriceLimitRule())
+
+passed, results = manager.check_orders(orders)
+```
+
 #### Stage 3: NLP (新闻情感分析)
 
 | 文件 | 功能 | 输入 | 输出 |
@@ -343,7 +380,11 @@ python -m src.backtest.run_backtest \
   - [x] 配置交易成本 (佣金/印花税/涨跌停)
   - [x] 运行回测
   - [x] 生成报告 (夏普比率/最大回撤/Calmar比率)
-- [ ] 风险控制模块
+- [x] 风险控制模块 (`src/risk/rules.py`)
+  - [x] StopSignRule: ST 股票和停牌股票过滤
+  - [x] PositionLimitRule: 单只股票持仓比例限制
+  - [x] PriceLimitRule: 涨跌停限制
+  - [x] RiskManager: 多规则管理器
 
 ### 测试覆盖
 
@@ -354,10 +395,11 @@ python -m src.backtest.run_backtest \
 - [x] 策略模块测试 (`test_strategy.py`)
 - [x] 滚动训练测试 (`test_model.py::TestRollingTrainer`)
 - [x] 回测模块测试 (`test_backtest.py`)
+- [x] 风控模块测试 (`test_risk.py`)
 - [x] 集成测试 (`test_integration.py`)
 - [ ] 端到端真实数据测试
 
-**测试统计**: 66 个测试用例全部通过 ✅
+**测试统计**: 86 个测试用例全部通过 ✅
 
 ### 文档
 

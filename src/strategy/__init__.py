@@ -15,7 +15,10 @@ from src.strategy.topk_dropout import (
     save_holdings,
 )
 
+from src.strategy.topk_strategy import TopKStrategy
+
 __all__ = [
+    # Top-K Dropout (standalone)
     "TopKDropoutStrategy",
     "StrategyConfig",
     "TradeSignal",
@@ -24,5 +27,7 @@ __all__ = [
     "load_predictions",
     "load_holdings",
     "save_holdings",
+    # Qlib Strategy
+    "TopKStrategy",
 ]
 

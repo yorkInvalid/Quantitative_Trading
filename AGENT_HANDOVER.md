@@ -1,6 +1,6 @@
 # 🤖 Agent 交接文档 | AGENT HANDOVER
 
-> **文档版本**: v1.2  
+> **文档版本**: v1.3  
 > **更新日期**: 2024-12-29  
 > **适用对象**: 接手的 AI Agent 或开发者
 
@@ -53,9 +53,14 @@ Quantitative_Trading/
 │   ├── 📁 nlp/
 │   │   └── 📄 sentiment.py          # ✅ FinBERT 情感分析器 (Score = P(+) - P(-))
 │   │
-│   └── 📁 strategy/
+│   ├── 📁 strategy/
+│   │   ├── 📄 __init__.py            # ✅ 模块初始化
+│   │   ├── 📄 topk_dropout.py        # ✅ Top-K Dropout 换仓策略
+│   │   └── 📄 topk_strategy.py       # ✅ Qlib 回测策略 (BaseStrategy)
+│   │
+│   └── 📁 backtest/
 │       ├── 📄 __init__.py            # ✅ 模块初始化
-│       └── 📄 topk_dropout.py        # ✅ Top-K Dropout 换仓策略
+│       └── 📄 run_backtest.py        # ✅ 回测执行器 + 报告生成
 │
 ├── 📁 tests/
 │   ├── 📄 test_etl.py               # ✅ ETL 单元测试 (monkeypatch mock)
@@ -221,6 +226,38 @@ merged_df = merge_rolling_predictions(
 - `valid_window`: 60 交易日（约 3 个月）
 - `test_window`: 20 交易日（等于 step）
 
+**回测框架**:
+```python
+from src.backtest.run_backtest import run_backtest, BacktestConfig
+
+# 配置回测参数
+config = BacktestConfig(
+    start_time="2023-01-01",
+    end_time="2023-12-31",
+    topk=50,
+    n_drop=100,
+    init_cash=1_000_000,
+    predictions_path="/app/data/predictions.csv",
+)
+
+# 运行回测
+portfolio, analysis = run_backtest(config=config)
+
+# 查看结果
+print(f"夏普比率: {analysis['sharpe_ratio']:.2f}")
+print(f"最大回撤: {analysis['max_drawdown']*100:.2f}%")
+print(f"年化收益: {analysis['annual_return']*100:.2f}%")
+```
+
+或使用命令行：
+```bash
+python -m src.backtest.run_backtest \
+    --predictions /app/data/predictions.csv \
+    --start 2023-01-01 \
+    --end 2023-12-31 \
+    --topk 50
+```
+
 #### Stage 3: NLP (新闻情感分析)
 
 | 文件 | 功能 | 输入 | 输出 |
@@ -298,7 +335,14 @@ merged_df = merge_rolling_predictions(
   - [x] 持仓跟踪与更新
   - [x] 情感黑名单过滤 (sentiment < -0.5)
   - [x] 交易信号生成 (BUY/SELL/HOLD)
-- [ ] 回测框架集成
+- [x] Qlib 回测策略 (`src/strategy/topk_strategy.py`)
+  - [x] 继承 BaseStrategy
+  - [x] 实现 generate_trade_decision()
+- [x] 回测框架 (`src/backtest/run_backtest.py`)
+  - [x] 加载预测结果
+  - [x] 配置交易成本 (佣金/印花税/涨跌停)
+  - [x] 运行回测
+  - [x] 生成报告 (夏普比率/最大回撤/Calmar比率)
 - [ ] 风险控制模块
 
 ### 测试覆盖
@@ -309,10 +353,11 @@ merged_df = merge_rolling_predictions(
 - [x] NLP 情感测试 (`test_nlp.py`)
 - [x] 策略模块测试 (`test_strategy.py`)
 - [x] 滚动训练测试 (`test_model.py::TestRollingTrainer`)
+- [x] 回测模块测试 (`test_backtest.py`)
 - [x] 集成测试 (`test_integration.py`)
 - [ ] 端到端真实数据测试
 
-**测试统计**: 53 个测试用例全部通过 ✅
+**测试统计**: 66 个测试用例全部通过 ✅
 
 ### 文档
 
@@ -437,6 +482,7 @@ print(f"黑名单: {result.blacklist}")
 | 训练好的模型 | `/app/data/models/trained/*.pkl` |
 | 滚动训练模型 | `/app/data/models/rolling/*.pkl` |
 | 滚动预测结果 | `/app/data/predictions/rolling/*.csv` |
+| 回测报告 | `/app/data/backtest_reports/` |
 | 最终买入列表 | `/app/data/final_buy_list_{date}.csv` |
 | FinBERT 模型缓存 | `/app/data/models/` |
 | Qlib 配置 | `/app/config/workflow.yaml` |
